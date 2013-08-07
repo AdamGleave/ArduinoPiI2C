@@ -30,7 +30,7 @@ typedef struct {
 } sensor;
 
 // DO need to change the next two things:
-#define I2C_ADDRESS 42 // must be between 8-120. Make sure this is different to other devices you connect!
+#define I2C_ADDRESS 42 // must be between 8 and 119. Make sure this is different to other devices you connect!
 
 /* To add a new sensor:
  * 1. Uncomment a line below, i.e. remove the // before it. Otherwise the line is ignored.
@@ -46,6 +46,7 @@ typedef struct {
  */
 sensor sensors[] = {
                       {"SENSOR1", &sensorVal1},
+                      //{"SENSOR2", &sensorVal1},
                       //{"SENSOR2", &sensorVal2},
                       //{"SENSOR3", &sensorVal3},
                       //{"SENSOR4", &sensorVal4},
@@ -89,6 +90,11 @@ void requestEvent()
 {
   if (!responseStr)
   { 
+    /* There will be problems using I2C if we don't respond within a fixed period of time
+     * so send a zero, which we program the master to ignore. This makes sure we have
+     * enough time to do some computation. */
+    Wire.write(0);
+        
     float responseNum;
     
     for (int i = 0; i < LENGTH(sensors); i++)
@@ -104,7 +110,11 @@ void requestEvent()
       }
     }
     if (!responseStr) { // no match
-      if (strcmp(request, "TEST") == 0) {
+      if (strcmp(request, "?") == 0)
+      {
+        responseStr = sensorList;  
+      }
+      else if (strcmp(request, "TEST") == 0) {
         responseStr = "HELLO";
       }
       else
@@ -112,25 +122,19 @@ void requestEvent()
         responseStr = "ERR"; 
       }
     }
-    
-    if (strcmp(request, "TEST") == 0) {
-      responseStr = "HELLO";
-    } else {
-      responseStr = "ERR";
-    }
       
-    Serial.print("Received ");
+    Serial.print("Read ");
     Serial.println(request);
     posIn = posOut = 0;
     request[0] = 0;
-    
-    Wire.write(0);
   }
   else
   {
-    if (responseStr[posOut] != '\0') {
+    if (responseStr[posOut] != '\0')
+    {
       Wire.write(responseStr[posOut++]);
-    } else
+    } 
+    else
     {
       Wire.write("\n");
       Serial.println(responseStr);
@@ -161,7 +165,7 @@ void setup()
   for (int i = 0; i < LENGTH(sensors); i++)
   {
     strcat(sensorList, sensors[i].name);
-    strcat(sensorList, "\n");
+    strcat(sensorList, "\t");
   }
   
   // Now call the user's code
