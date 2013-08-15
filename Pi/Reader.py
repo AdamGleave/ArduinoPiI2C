@@ -16,16 +16,21 @@ CSV_FILENAME = "Sensors.csv"
 def formatSensorList(sensors):
     return "\t".join(sensors)
 
-def print_err(*args):
+def printErr(*args):
     '''Print to stderr so we can separate information messages with readings from I2C'''
     print(*args, file=sys.stderr)
+
+def escapeSpecials(s):
+    '''Escapes any special characters. e.g. escapeSpecials("hello") returns "hello". escapeSpecials("\nhi\t") returns "\\nhi\\t".'''
+    escaped = repr(s)
+    return escaped[1:-1] # removes leading and trailing '
 
 def open_bus():
     try:
         bus = SMBus(DEVICE_ID)
-        print_err("Opened I2C bus #%d" % DEVICE_ID)
+        printErr("Opened I2C bus #%d" % DEVICE_ID)
     except IOError:
-        print_err("Could not open /dev/i2c-%d. Have you run `gpio load i2c`?" % DEVICE_ID)
+        printErr("Could not open /dev/i2c-%d. Have you run `gpio load i2c`?" % DEVICE_ID)
         sys.exit(-1)
     return bus
 
@@ -43,7 +48,7 @@ def scan():
         except IOError:
             pass # No device at this address
         except TimeoutException:
-            print_err("Timed out reading from address %d. Incorrectly configured device?" % address)
+            printErr("Timed out reading from address %d. Incorrectly configured device?" % address)
 
     return devices
 
@@ -93,10 +98,10 @@ def difference(devices, oldDevices):
         sensors = devices[address]
 
         sensors_desc = formatSensorList(sensors)
-        print_err("Address %d: Device connected, with sensors: %s" % (address, sensors_desc))
+        printErr("Address %d: Device connected, with sensors: %s" % (address, sensors_desc))
 
     for address in detached:
-        print_err("Address %d: Device detached" % address)
+        printErr("Address %d: Device detached" % address)
 
     for address in unchanged:
         sensors = set(devices[address])
@@ -115,7 +120,7 @@ def difference(devices, oldDevices):
 
         if added or removed: # there has been some change
             messagesStr = ",".join(messages)
-            print_err("Address %d: %s" % (address, messagesStr))
+            printErr("Address %d: %s" % (address, messagesStr))
 
 def poll(devices):
     response = {}
@@ -142,7 +147,7 @@ bus = open_bus()
 with open(CSV_FILENAME, 'ab') as csvfile:
     csv = csv.writer(csvfile)
 
-    print_err("I will list all connected I2C devices and attached sensors, and tell you whenever this changes.")
+    printErr("I will list all connected I2C devices and attached sensors, and tell you whenever this changes.")
     oldDevices = None
     devices = {}
     while True:
@@ -161,6 +166,7 @@ with open(CSV_FILENAME, 'ab') as csvfile:
             deviceReadings = allReadings[address]
             for sensorName in deviceReadings:
                 value = deviceReadings[sensorName]
+                value = escapeSpecials(value) # in case we read malformed data
                 print("%s = %s" % (sensorName, value), end=" ")
             print("")
                 

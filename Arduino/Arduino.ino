@@ -1,7 +1,8 @@
 /**************************** INSERT YOUR CODE HERE ***************************/
 
-/* This is example code. It stores the (approximate) time the Arduino has been running
- * into sensorVal1. You can then access that value over I2C, e.g. using the Raspberry Pi.
+/* This is example code. It stores the (approximate) time the Arduino has been running into sensorVal1.
+ * sensorVal2 contains a brief string description of how long the Arduino has been running.
+ * You can then access both values over I2C, e.g. using the Raspberry Pi.
  *
  * To use your own code, delete the code below.
  * Then, copy and paste your setup() and loop() functions.
@@ -9,47 +10,80 @@
  */
 
 float sensorVal1;
+char *sensorVal2;
 
 void your_setup()
 {
   sensorVal1 = 0.0;
+  sensorVal2 = "Just started";
 }
 
 void your_loop()
 {
   sensorVal1 = sensorVal1 + 1.0;
+  
+  if (sensorVal1 < 1000)
+  {
+    sensorVal2 = "Running for < 1 s";
+  }
+  else 
+  {
+    sensorVal2 = "Running for >1 s";
+  }
   delay(1);
 }
 
 /************************* CONFIGURATION -- EDIT THIS! *************************/
 
-// Do NOT need to change this
+// Do NOT need to change the next two things
+enum datatype {
+  FLOAT,
+  INT,
+  STRING
+};
+
 typedef struct {
   const char *name;
-  float *value;
+  enum datatype type;
+  void *value;
 } sensor;
 
-// DO need to change the next two things:
+// DO need to change the two things below
 #define I2C_ADDRESS 42 // must be between 8 and 119. Make sure this is different to other devices you connect!
 
 /* To add a new sensor:
- * 1. Uncomment a line below, i.e. remove the // before it. Otherwise the line is ignored.
- * 2. Change the name to something which describes what you're sending, e.g. change SENSOR1 to TEMPERATURE.
+ * 1. Uncomment a line below, by removing the // before it. Otherwise, the line is ignored.
+ *
+ * 2. Each line consists of three values, e.g:
+           {"SENSOR1", FLOAT, &sensorVal1}
+                ^         ^          ^
+                |         |          |
+                |         |          |
+              Name    Datatype   Variable             
+ * 3. Change the name to something which describes what you're sending, e.g. change SENSOR1 to TEMPERATURE.
  *
  *    IMPORTANT: Keep the double quotes (") either side of the name -- it means it is a string, not an identifier.
- * 3. Change the variable to what you're using to store your value; e.g. if your loop stores the temperature to temp_c,
- *    then change &sensorVal1 to &temp_c.
- *
- *    Note that the variable must be a numeric type, i.e. either an int or a float 
+ * 4. Change the variable to the identifier you're using to store your value.
+ *    e.g. if your loop stores the temperature to temp_c, then change &sensorVal1 to &temp_c.
  *
  *    IMPORTANT: Keep the & before the variable (look up 'pointers' to understand why this is necessary.)
+ *  5. Change the datatype to one of FLOAT, INT or STRING depending on the type of your variable. 
+ *     The type is before your variable. e.g. if you declare your variable like:
+ *         float sensorVal1; // in the example code
+ *     then the datatype should be FLOAT. If it was declared like:
+ *          int sensorVal1; 
+ *     then the datatype should be INT. If it is declared like:
+ *          char sensorVal1[32];
+ *     OR:
+ *          char *sensorVal1;
+ *     then the datatype should be STRING.
  */
 sensor sensors[] = {
-                      {"SENSOR1", &sensorVal1},
-                      //{"SENSOR2", &sensorVal1},
-                      //{"SENSOR2", &sensorVal2},
-                      //{"SENSOR3", &sensorVal3},
-                      //{"SENSOR4", &sensorVal4},
+                      {"SENSOR1", FLOAT, &sensorVal1},
+                      {"SENSOR2", STRING, &sensorVal2},
+                      //{"SENSOR3", FLOAT, &sensorVal3},
+                      //{"SENSOR4", FLOAT, &sensorVal4},
+                      //{"SENSOR5", STRING, &sensorVal5},
                     };
 
 /************************* NO NEED TO CHANGE THE CODE BELOW *******************/
@@ -94,8 +128,6 @@ void requestEvent()
      * so send a zero, which we program the master to ignore. This makes sure we have
      * enough time to do some computation. */
     Wire.write(0);
-        
-    float responseNum;
     
     for (int i = 0; i < LENGTH(sensors); i++)
     {
@@ -103,12 +135,35 @@ void requestEvent()
       
       if (strcmp(request, aSensor.name) == 0)
       { // match
-        responseNum = *aSensor.value;
-        dtostrf(responseNum, CONVERSION_WIDTH, CONVERSION_PRECISION, responseBuf);
-        responseStr = responseBuf;
-        break;
+        float responseFloat;
+        int responseInt;
+        switch (aSensor.type)
+        { // perform conversion to string depending on data type
+          case FLOAT:
+            responseFloat = *((float *)aSensor.value);
+            dtostrf(responseFloat, CONVERSION_WIDTH, CONVERSION_PRECISION, responseBuf);
+            responseStr = responseBuf;
+            break;
+          case INT:
+            responseInt = *((int *)aSensor.value);
+            itoa(responseInt, responseBuf, 10);
+            responseStr = responseBuf;
+            break;
+          case STRING:
+            // it would make more sense to point directly to a string (char *)
+            // than a pointer to a pointer to a string (char **),
+            // but use the latter to keep things consistent in configuration
+            responseStr = *((char **)aSensor.value);
+            break;
+          default:
+            Serial.println("ERROR: Unrecognised sensor data type.");          
+            break;
+        }
+        
+        break; // leave for loop
       }
     }
+    
     if (!responseStr) { // no match
       if (strcmp(request, "?") == 0)
       {
