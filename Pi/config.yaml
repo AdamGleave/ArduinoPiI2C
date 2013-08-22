@@ -1,0 +1,44 @@
+# Filename of CSV log for all sensor output
+csv-log: 'Sensors.csv'
+
+# Number of seconds to wait between requesting data from sensors
+poll-interval: 10 
+
+i2c:
+    # We will open /dev/i2c-DEVICEID
+    # Should be 1 on Raspberry Pi Model A and Model B revision 2.
+    # Should be 0 on Raspberry Pi Model B revision 1.
+    device-id: 1 
+    slaves:
+        # Address range we scan for.
+        # Note start and end addresess are included in the range.
+        start: 8
+        end: 119
+    # Seconds to wait for response from slave
+    timeout: 1
+
+# Control the power of slaves by toggling a GPIO pin?
+# (Needs extra power control circuit.)
+# Power of slaves is turned off when there is an I2C error.
+# This shouldn't be necessary, but useful when prototyping, etc.
+powerCtl:
+    # Do we control the power?
+    # Note if it is false, then no power control code runs.
+    # This means the output of the GPIO pin is completely untouched,
+    # NOT that it is permanently on.
+    #
+    # So if you disable this, then also bypass the power control circuit.
+    enabled: true
+    # GPIO pin to use (Broadcom pinout: see e.g. http://pi.gadgetoid.com/pinout)
+    pin: 7
+    # Set to true if your power control circuit turns power on when the GPIO pin is high.
+    # Otherwise set to false.
+    # (Depends if you use a p-channel or n-channel MOSFET, etc.)
+    onIfHigh: true
+    # Seconds devices are powered off after an I2C error.
+    powerOffTime: 1
+    # Seconds we wait before reading after turning power on again
+    waitFor: 2
+    
+
+
