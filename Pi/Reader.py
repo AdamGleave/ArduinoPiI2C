@@ -6,25 +6,18 @@ import datetime
 import time
 import signal
 import RPi.GPIO as GPIO
+import yaml
 
-START_ADDRESS = 8 # includes start address
-END_ADDRESS = 120 # omits end address
-DEVICE_ID = 1 # indicates /dev/i2c-DEVICE_ID
-POLL_INTERVAL = 2 # in seconds
-TIMEOUT = 3 # in seconds
+CONFIG_FILENAME = "config.yaml"
 
-POWER_CONTROL_ENABLED = True
-POWER_CONTROL_PIN = 7 # in Wiring Pi pinout
-# Default is to pull POWER_CONTROL_PIN high when power should be on, and low when should be off
-# May need to change this depending on details of circuit being used.
-# e.g. if connected directly to a PMOS, low will turn power on
-POWER_CONTROL_ON = 1
-POWER_CONTROL_OFF = 0
-# Times
-POWER_CONTROL_INTERVAL = 1 # seconds devices are powered off
-POWER_CONTROL_WAIT = 2 # seconds before reading after powering on devices
-
-CSV_FILENAME = "Sensors.csv"
+def load_config():
+    with open(CONFIG_FILENAME, 'rb') as configFile:
+        config = yaml.load(configFile)
+        if config['powerCtl']['enabled']:
+            onIfHigh = config['powerCtl']['onIfHigh']
+            config['powerCtl']['onOutput'] = 1 if onIfHigh else 0
+            config['powerCtl']['offOutput'] = 0 if onIfHigh else 1
+        return config
 
 def formatSensorList(sensors):
     return "\t".join(sensors)
@@ -39,11 +32,12 @@ def escapeSpecials(s):
     return escaped[1:-1] # removes leading and trailing '
 
 def open_bus():
+    deviceId = config['i2c']['device-id']
     try:
-        bus = SMBus(DEVICE_ID)
-        printErr("Opened I2C bus #%d" % DEVICE_ID)
+        bus = SMBus(deviceId)
+        printErr("Opened I2C bus #%d" % deviceId)
     except IOError:
-        printErr("Could not open /dev/i2c-%d. Have you run `gpio load i2c`?" % DEVICE_ID)
+        printErr("Could not open /dev/i2c-%d. Have you run `gpio load i2c`?" % deviceId)
         sys.exit(-1)
     return bus
 
@@ -51,8 +45,10 @@ def scan():
     global i2c_error
 
     devices = {}
-
-    for address in range(START_ADDRESS, END_ADDRESS):
+    
+    startAddress = config["i2c"]["slaves"]["start"]
+    endAddress = config["i2c"]["slaves"]["end"]
+    for address in range(startAddress, endAddress + 1):
         try:
             bus.write_byte(address, ord("?"))
 
@@ -78,7 +74,7 @@ def readResponse(address):
     response = ""
 
     old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(TIMEOUT)
+    signal.alarm(config['i2c']['timeout'])
     try:
         while True:
             byte = bus.read_byte(address)
@@ -163,28 +159,31 @@ def poll(devices):
     return response
 
 def power_control_setup():
-    if POWER_CONTROL_ENABLED:
+    if config['powerCtl']['enabled']:
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(POWER_CONTROL_PIN, GPIO.OUT)    
-        GPIO.output(POWER_CONTROL_PIN, POWER_CONTROL_ON)
+        GPIO.setup(config['powerCtl']['pin'], GPIO.OUT)    
+        GPIO.output(config['powerCtl']['pin'], config['powerCtl']['onOutput'])
+
+        time.sleep(config['powerCtl']['waitFor'])
 
 def power_control_cycle():
-    if POWER_CONTROL_ENABLED:
+    if config['powerCtl']:
         printErr("Turning power OFF.")
-        GPIO.output(POWER_CONTROL_PIN, POWER_CONTROL_OFF)
+        GPIO.output(config['powerCtl']['pin'], config['powerCtl']['offOutput'])
 
-        time.sleep(POWER_CONTROL_INTERVAL)
+        time.sleep(config['powerCtl']['powerOffTime'])
 
-        GPIO.output(POWER_CONTROL_PIN, POWER_CONTROL_ON)
+        GPIO.output(config['powerCtl']['pin'], config['powerCtl']['onOutput'])
         printErr("Turning power ON.")
 
-        time.sleep(POWER_CONTROL_WAIT)
+        time.sleep(config['powerCtl']['waitFor'])
 
+config = load_config()
 bus = open_bus()
 power_control_setup()
 i2c_error = False
 
-with open(CSV_FILENAME, 'ab') as csvfile:
+with open(config['csv-log'], 'ab') as csvfile:
     csv = csv.writer(csvfile)
 
     printErr("I will list all connected I2C devices and attached sensors, and tell you whenever this changes.")
@@ -226,4 +225,4 @@ with open(CSV_FILENAME, 'ab') as csvfile:
             power_control_cycle()
             i2c_error = False
 
-        time.sleep(POLL_INTERVAL)
+        time.sleep(config['poll-interval'])
