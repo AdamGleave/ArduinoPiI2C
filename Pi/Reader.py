@@ -178,51 +178,54 @@ def power_control_cycle():
 
         time.sleep(config['powerCtl']['waitFor'])
 
-config = load_config()
-bus = open_bus()
-power_control_setup()
-i2c_error = False
+try:
+    config = load_config()
+    bus = open_bus()
+    power_control_setup()
+    i2c_error = False
 
-with open(config['csv-log'], 'ab') as csvfile:
-    csv = csv.writer(csvfile)
+    with open(config['csv-log'], 'ab') as csvfile:
+        csv = csv.writer(csvfile)
 
-    printErr("I will list all connected I2C devices and attached sensors, and tell you whenever this changes.")
-    oldDevices = None
-    devices = {}
-    while True:
-        print("\n*****")
-        oldDevices = devices
-        devices = scan()
+        printErr("I will list all connected I2C devices and attached sensors, and tell you whenever this changes.")
+        oldDevices = None
+        devices = {}
+        while True:
+            print("\n*****")
+            oldDevices = devices
+            devices = scan()
 
-        difference(devices, oldDevices)
+            difference(devices, oldDevices)
 
-        print("")
-        allReadings = poll(devices)
-
-        # Print to terminal
-        for address in allReadings:
-            print("Address %d:" % address, end=" ")
-            deviceReadings = allReadings[address]
-            for sensorName in deviceReadings:
-                value = deviceReadings[sensorName]
-                value = escapeSpecials(value) # in case we read malformed data
-                print("%s = %s" % (sensorName, value), end=" ")
             print("")
-                
-        # Log to CSV
-        dt = datetime.datetime.utcnow()
-        timeStamp = dt.isoformat() + "+00:00" # specify we're in UTC timezone
-        for address in allReadings:
-            deviceReadings = allReadings[address]
-            for sensorName in deviceReadings:
-                value = deviceReadings[sensorName]
-                row = [timeStamp, sensorName, value]
-                csv.writerow(row)
+            allReadings = poll(devices)
 
-        # Have we encountered an error in the read?
-        if i2c_error:
-            printErr("An I2C error occurred at some point in this cycle (see above for details.")
-            power_control_cycle()
-            i2c_error = False
+            # Print to terminal
+            for address in allReadings:
+                print("Address %d:" % address, end=" ")
+                deviceReadings = allReadings[address]
+                for sensorName in deviceReadings:
+                    value = deviceReadings[sensorName]
+                    value = escapeSpecials(value) # in case we read malformed data
+                    print("%s = %s" % (sensorName, value), end=" ")
+                print("")
+                    
+            # Log to CSV
+            dt = datetime.datetime.utcnow()
+            timeStamp = dt.isoformat() + "+00:00" # specify we're in UTC timezone
+            for address in allReadings:
+                deviceReadings = allReadings[address]
+                for sensorName in deviceReadings:
+                    value = deviceReadings[sensorName]
+                    row = [timeStamp, sensorName, value]
+                    csv.writerow(row)
 
-        time.sleep(config['poll-interval'])
+            # Have we encountered an error in the read?
+            if i2c_error:
+                printErr("An I2C error occurred at some point in this cycle (see above for details.")
+                power_control_cycle()
+                i2c_error = False
+
+            time.sleep(config['poll-interval'])
+finally:
+    GPIO.cleanup()
