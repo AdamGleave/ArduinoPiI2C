@@ -128,54 +128,63 @@ void requestEvent()
      * so send a zero, which we program the master to ignore. This makes sure we have
      * enough time to do some computation. */
     Wire.write(0);
-    
-    for (int i = 0; i < LENGTH(sensors); i++)
-    {
-      sensor aSensor = sensors[i];
-      
-      if (strcmp(request, aSensor.name) == 0)
-      { // match
-        float responseFloat;
-        int responseInt;
-        switch (aSensor.type)
-        { // perform conversion to string depending on data type
-          case FLOAT:
-            responseFloat = *((float *)aSensor.value);
-            dtostrf(responseFloat, CONVERSION_WIDTH, CONVERSION_PRECISION, responseBuf);
-            responseStr = responseBuf;
-            break;
-          case INT:
-            responseInt = *((int *)aSensor.value);
-            itoa(responseInt, responseBuf, 10);
-            responseStr = responseBuf;
-            break;
-          case STRING:
-            // it would make more sense to point directly to a string (char *)
-            // than a pointer to a pointer to a string (char **),
-            // but use the latter to keep things consistent in configuration
-            responseStr = *((char **)aSensor.value);
-            break;
-          default:
-            Serial.println("ERROR: Unrecognised sensor data type.");          
-            break;
-        }
+ 
+     if (strcmp(request, "?") == 0)
+     {
+       responseStr = sensorList;  
+     }
+     else if (strcmp(request, "TEST") == 0)
+     {
+       responseStr = "HELLO";
+     }
+     else if (strcmp(request, "DIE") == 0) 
+     {
+       // intended for software testing -- do not use!
+       while (1) { 
+         delay(1);
+       }
+     }
+    else
+    { // not a built-in command; must be a sensor 
+      for (int i = 0; i < LENGTH(sensors); i++)
+      {
+        sensor aSensor = sensors[i];
         
-        break; // leave for loop
+        if (strcmp(request, aSensor.name) == 0)
+        { // match
+          float responseFloat;
+          int responseInt;
+          switch (aSensor.type)
+          { // perform conversion to string depending on data type
+            case FLOAT:
+              responseFloat = *((float *)aSensor.value);
+              dtostrf(responseFloat, CONVERSION_WIDTH, CONVERSION_PRECISION, responseBuf);
+              responseStr = responseBuf;
+              break;
+            case INT:
+              responseInt = *((int *)aSensor.value);
+              itoa(responseInt, responseBuf, 10);
+              responseStr = responseBuf;
+              break;
+            case STRING:
+              // it would make more sense to point directly to a string (char *)
+              // than a pointer to a pointer to a string (char **),
+              // but use the latter to keep things consistent in configuration
+              responseStr = *((char **)aSensor.value);
+              break;
+            default:
+              Serial.println("ERROR: Unrecognised sensor data type.");          
+              break;
+          }
+          
+          break; // leave for loop
+        }
       }
     }
     
-    if (!responseStr) { // no match
-      if (strcmp(request, "?") == 0)
-      {
-        responseStr = sensorList;  
-      }
-      else if (strcmp(request, "TEST") == 0) {
-        responseStr = "HELLO";
-      }
-      else
-      { // not a recognised sensor or built-in command
-        responseStr = "ERR"; 
-      }
+    if (!responseStr)
+    { // no match; not a recognised sensor or built-in type
+      responseStr = "ERR"; 
     }
       
     Serial.print("Read ");
@@ -231,4 +240,3 @@ void loop()
 {
   your_loop();
 }
-
