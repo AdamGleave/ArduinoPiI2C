@@ -1,0 +1,26 @@
+mqtt:
+    # Host name or IP address of MQTT broker
+    server: "37.34.56.108" # disdrometrics MQTT broker
+    # Port
+    port: 1883 # IANA standard for MQTT
+    # Interval in seconds to send keep alive messages
+    keepAlive: 60
+    
+    # 0: The broker/client will deliver the message once, with no confirmation.
+    # 1: The broker/client will deliver the message at least once, with confirmation required.
+    # 2: The broker/client will deliver the message exactly once by using a four step handshake.
+    reliability: 1
+
+    topic:
+        # All topics used will start with this prefix.
+        # Must include a leading '/'. Can include multiple directories.
+        # e.g. '/multi/level/prefix'
+        prefix: "/tahmo" # default should not be changed for TAHMO-connected projects
+
+        # Unique identifier for your sensor workshop
+        instance: "TestLocation" # this SHOULD be changed!
+
+# Path to CSV file produced by Pi/Reader.py
+csvPath: "../Pi/Sensors.csv"
+# Path to file storing last-updated time
+lastUpdatedPath: "last_update"

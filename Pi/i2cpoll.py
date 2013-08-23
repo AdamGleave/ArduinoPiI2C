@@ -7,6 +7,7 @@ import time
 import signal
 import RPi.GPIO as GPIO
 import yaml
+import fcntl
 
 CONFIG_FILENAME = "config.yaml"
 
@@ -212,13 +213,20 @@ try:
                     
             # Log to CSV
             dt = datetime.datetime.utcnow()
-            timeStamp = dt.isoformat() + "+00:00" # specify we're in UTC timezone
+            timeStamp = dt.isoformat()
+
+            # Acquire exclusive write lock.
+            # Prevents e.g. publishcsv.py from reading at the same time
+            fcntl.flock(csvfile, fcntl.LOCK_EX)
             for address in allReadings:
                 deviceReadings = allReadings[address]
                 for sensorName in deviceReadings:
                     value = deviceReadings[sensorName]
                     row = [timeStamp, sensorName, value]
                     csv.writerow(row)
+            csvfile.flush()
+            # Release lock
+            fcntl.flock(csvfile, fcntl.LOCK_UN)
 
             # Have we encountered an error in the read?
             if i2c_error:
